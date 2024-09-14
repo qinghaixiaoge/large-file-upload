@@ -84,7 +84,7 @@ const storageComplete = multer.diskStorage({
     }
 })
 // 限制文件大小和类型
-const extArray = [".mp3"]
+const extArray = [".mp3",".mp4",".jpg",".jpeg",".png"]
 const uploadComplete = multer({
     storage: storageComplete,
     limits: {
