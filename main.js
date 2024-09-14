@@ -52,7 +52,7 @@ const upload = multer({
         if (file.originalname === "blob") {
             cb(null, true)
         } else {
-            cb(new Error(`不支持${ext}文件类型}`))
+            cb(new Error(`不支持${ext}文件类型`))
         }
     }
 }).single("chunk")
@@ -95,7 +95,7 @@ const uploadComplete = multer({
         if (extArray.includes(ext)) {
             cb(null, true)
         } else {
-            cb(new Error(`不支持${ext}文件类型}`))
+            cb(new Error(`不支持${ext}文件类型`))
         }
     }
 }).single("file")
