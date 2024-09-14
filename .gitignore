@@ -4,4 +4,4 @@ node_modules
 
 # 取消忽略 chunks 目录及其所有子内容
 !/upload/chunks/
-# !/upload/chunks/**
+!/upload/chunks/**
