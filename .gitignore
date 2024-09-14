@@ -1,1 +1,4 @@
 node_modules
+upload/*
+!upload/chunks
+upload/chunks/*
