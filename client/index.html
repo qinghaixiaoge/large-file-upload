@@ -37,8 +37,8 @@
                 alert(data)
                 return
             } else {
-                // 不分片
-                if (file.size < 1024 * 1024 * 5) {
+                // 文件小于等于20MB不切片
+                if (file.size <= 1024 * 1024 * 20) {
                     const result = await uploadFile(file, hash)
                     return
                 }
@@ -141,7 +141,7 @@
         function cutFile(file) {
             return new Promise((resolve) => {
                 const fileSize = file.size;
-                const CHUNK_SIZE = 1024 * 1024 * 1;
+                const CHUNK_SIZE = 1024 * 1024 * 20;
                 // 切片数量
                 const CHUNK_COUNT = Math.ceil(fileSize / CHUNK_SIZE);
                 // 线程数量

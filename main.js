@@ -43,7 +43,7 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 1024 * 1024 * 1.01 // 1MB
+        fileSize: 1024 * 1024 * 20 + 1 // 限制切片小于20MB
     },
     fileFilter(req, file, cb) {
         // 文件名为blob，说明是切片文件【不是切片，该值表示文件原名例如 播放.mp3】
@@ -88,7 +88,7 @@ const extArray = [".mp3"]
 const uploadComplete = multer({
     storage: storageComplete,
     limits: {
-        fileSize: 1024 * 1024 * 5.01 // 5MB
+        fileSize: 1024 * 1024 * 20 + 1 //限制文件小于20MB
     },
     fileFilter(req, file, cb) {
         const ext = path.extname(file.originalname)
@@ -153,6 +153,7 @@ router.get("/merge", handlerAsync(async (req, res, next) => {
     const chunk_Path = path.resolve(__dirname, `upload/chunks/${hash}`)
     const isExist = await fse.pathExists(chunk_Path)
     if (isExist) {
+        console.log(chunk_Path);
         await mergeFiles(chunk_Path, path.resolve(__dirname, `upload/${hash}${ext}`))
         res.send({ code: true, msg: null, url: "/res/" + hash + ext })
     } else {

@@ -20,11 +20,13 @@ function readFileStream(file) {
 module.exports = async function mergeFiles(chunkDir, outputFile) {
     const outputStream = fs.createWriteStream(outputFile);
     let inputFiles = await fse.readdir(chunkDir);
-    inputFiles = inputFiles.map(file => path.join(chunkDir, file));
-    inputFiles = inputFiles.sort((a, b) => parseInt(a.split('-')[0]) - parseInt(b.split('-')[0]))
+    inputFiles = inputFiles.sort((a, b) => {
+       return parseInt(a.split('-')[0]) - parseInt(b.split('-')[0])
+    })
     for (let i = 0; i < inputFiles.length; i++) {
         const file = inputFiles[i];
-        const fileData = await readFileStream(file);
+        // console.log(file)
+        const fileData = await readFileStream(path.resolve(chunkDir, file));
         outputStream.write(fileData);
 
         // 如果是最后一个文件，结束输出流
