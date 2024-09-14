@@ -32,7 +32,7 @@
 
 ### 合并文件
 
-`"http://127.0.0.1:1122/verify?merge=" + hash + "&fileName=" + fileName` `GET`
+`"http://127.0.0.1:1122/merge?hash=" + hash + "&fileName=" + fileName` `GET`
 
 | 键       | 值       |
 | -------- | -------- |
