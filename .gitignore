@@ -1,7 +1,1 @@
 node_modules
-# 忽略 upload 目录下的所有内容
-/upload/*
-
-# 取消忽略 chunks 目录及其所有子内容
-!/upload/chunks/
-!/upload/chunks/**
