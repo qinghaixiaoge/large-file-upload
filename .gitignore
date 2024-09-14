@@ -5,4 +5,4 @@ node_modules
 # 之前跟踪过的，在设置.gitignore还是会跟踪，需要git rm --cached从本地仓库中移除，在设置.gitignore中忽略跟踪
 # 取消忽略 chunks 目录及其所有子内容
 !/upload/chunks/
-!/upload/chunks/**
+# !/upload/chunks/**
