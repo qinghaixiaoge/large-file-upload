@@ -58,8 +58,28 @@
         inputDom.onchange = async function () {
             controller.file = this.files[0];
             controller.fileName = controller.file.name;
+            // 文件小于10MB不切片，直接上传
+            if (controller.file.size <= 1024 * 1024 * 10) {
+                const spark = new SparkMD5();
+                spark.append(controller.file.name + controller.file.size); // 用文件名+大小模拟 hash
+                const hash = spark.end();
+                const { data: { code, msg, data } } = await axios.get(`http://127.0.0.1:3000/verify?hash=${hash}&fileName=${controller.fileName}`);
+                if (code) {
+                    alert(data);
+                    return;
+                }
+                const formData = new FormData();
+                formData.append("hash", hash);
+                formData.append("file", controller.file);
+                await axios.post("http://127.0.0.1:3000/upload/complete", formData, {
+                    onUploadProgress(e) {
+                        const percent = Math.round((e.loaded * 100) / e.total);
+                        progressBar.value = percent;
+                    }
+                });
+                return;
+            }
             controller.chunkArray = await cutFile(controller.file);
-
             const str = controller.chunkArray.map(item => item.hash).toString();
             const spark = new SparkMD5();
             spark.append(str);
@@ -74,20 +94,6 @@
                 alert(data);
                 return;
             }
-
-            if (controller.file.size <= 1024 * 1024 * 10) {
-                const formData = new FormData();
-                formData.append("hash", controller.hash);
-                formData.append("file", controller.file);
-                await axios.post("http://127.0.0.1:3000/upload/complete", formData, {
-                    onUploadProgress(e) {
-                        const percent = Math.round((e.loaded * 100) / e.total);
-                        progressBar.value = percent;
-                    }
-                });
-                return;
-            }
-
             controller.uploadedCountStart = data.length;
             const notUploaded = controller.chunkArray.filter(chunk => !data.includes(chunk.index + "-" + chunk.hash));
             if (notUploaded.length === 0) {

@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("./client"));
-app.use("/res", express.static("upload"));
+app.use("/res", express.static("static"));
 app.use((req, res, next) => {
   if (req.method === "options") {
     next();
@@ -33,7 +33,7 @@ const storage = {
     // 只能拿文件字段之前的body信息和query
     // console.log(file); // 文件信息
     const { hash, chunkName } = req.body; // ⚠️改成 query 或 headers 避免 req.body 还未处理
-    const chunkDir = path.resolve(__dirname, `upload/chunks//${hash}`);
+    const chunkDir = path.resolve(__dirname, `static/chunks//${hash}`);
     fse
       .ensureDir(chunkDir)
       .then(() => {
@@ -109,16 +109,18 @@ router.post("/upload", (req, res, next) => {
 // 配置完整文件上传
 const storageComplete = multer.diskStorage({
   destination: function (req, file, cb) {
-    const file_Path = path.resolve(__dirname, `upload`);
+    const file_Path = path.resolve(__dirname, `static`);
     cb(null, file_Path);
   },
   filename: function (req, file, cb) {
     // const originalname = Buffer.from(file.originalname, "latin1").toString("utf8");
+    console.log(req.body.hash);
+
     const ext = path.extname(file.originalname);
     cb(null, req.body.hash + ext);
   },
 });
-// 限制文件大小和类型
+// 限制完整文件大小和类型
 const extArray = [".mp3", ".mp4", ".jpg", ".jpeg", ".png"];
 const uploadComplete = multer({
   storage: storageComplete,
@@ -165,14 +167,14 @@ router.get(
     const fileName = req.query.fileName;
     const ext = path.extname(fileName); //.mp3
     const isExist = await fse.pathExists(
-      path.resolve(__dirname, `upload/${hash}${ext}`)
+      path.resolve(__dirname, `static/${hash}${ext}`)
     );
     if (isExist) {
       res.send({ code: true, msg: null, data: "文件已存在" });
       return;
     } else {
       // 文件不存在，查看已上传的切片文件
-      const chunk_Path = path.resolve(__dirname, `upload/chunks/${hash}`);
+      const chunk_Path = path.resolve(__dirname, `static/chunks/${hash}`);
       const chunk_isExist = await fse.pathExists(chunk_Path);
       if (chunk_isExist) {
         // 返回已上传切片的列表
@@ -192,12 +194,12 @@ router.get(
     const hash = req.query.hash;
     const fileName = req.query.fileName;
     const ext = path.extname(fileName);
-    const chunk_Path = path.resolve(__dirname, `upload/chunks/${hash}`);
+    const chunk_Path = path.resolve(__dirname, `static/chunks/${hash}`);
     const isExist = await fse.pathExists(chunk_Path);
     if (isExist) {
       await mergeFiles(
         chunk_Path,
-        path.resolve(__dirname, `upload/${hash}${ext}`)
+        path.resolve(__dirname, `static/${hash}${ext}`)
       );
       res.send({ code: true, msg: null, url: "/res/" + hash + ext });
     } else {
