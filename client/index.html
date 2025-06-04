@@ -2,8 +2,8 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>大文件分片</title>
     <style>
         * {
@@ -11,168 +11,208 @@
             padding: 0;
             box-sizing: border-box;
         }
+
+        body {
+            padding: 20px;
+            font-family: sans-serif;
+        }
+
+        button {
+            margin-right: 10px;
+            padding: 8px 12px;
+        }
+
+        progress {
+            display: block;
+            width: 100%;
+            height: 20px;
+            margin: 20px 0;
+        }
     </style>
 </head>
 
 <body>
+
+    <input type="file" id="fileInput">
+    <br />
+    <button id="toggleButton" onclick="toggleUpload()">暂停上传</button>
     <progress id="uploadProgress" value="0" max="100"></progress>
-    <input type="file">
+
     <script src="./spark-md5.js"></script>
     <script src="./axios.js"></script>
     <script>
-        const progressBar = document.getElementById('uploadProgress');
-        const inputDom = document.querySelector('input');
+        const inputDom = document.getElementById("fileInput");
+        const progressBar = document.getElementById("uploadProgress");
+        const toggleButton = document.getElementById("toggleButton");
+
+        let controller = {
+            isPaused: false,
+            abortList: [],
+            file: null,
+            hash: '',
+            chunkArray: [],
+            fileName: '',
+            uploadedCountStart: 0
+        };
+
         inputDom.onchange = async function () {
-            let Not_UploadArray;
-            const file = this.files[0];
-            const fileSize = file.size;
-            const chunkArray = await cutFile(file);
-            const str = chunkArray.map(item => item.hash).toString()
-            const spark = new SparkMD5()
-            spark.append(str)
-            const hash = spark.end()
-            // 查看当前文件已上传的切片数据
-            const { data: { code, msg, data } } = await axios.get("http://127.0.0.1:1122/verify?hash=" + hash + "&fileName=" + file.name)
+            controller.file = this.files[0];
+            controller.fileName = controller.file.name;
+            controller.chunkArray = await cutFile(controller.file);
+
+            const str = controller.chunkArray.map(item => item.hash).toString();
+            const spark = new SparkMD5();
+            spark.append(str);
+            controller.hash = spark.end();
+
+            verifyAndUpload();
+        };
+
+        async function verifyAndUpload() {
+            const { data: { code, msg, data } } = await axios.get(`http://127.0.0.1:3000/verify?hash=${controller.hash}&fileName=${controller.fileName}`);
             if (code) {
-                alert(data)
-                return
-            } else {
-                // 文件小于等于20MB不切片
-                if (file.size <= 1024 * 1024 * 20) {
-                    const result = await uploadFile(file, hash)
-                    return
-                }
-                // 筛选出未上传的切片数据
-                Not_UploadArray = chunkArray.filter((chunk, index) => {
-                    return !data.includes(chunk.index + "-" + chunk.hash)
-                })
-                if (Not_UploadArray.length === 0) {
-                    // 进行合并操作
-                    const result = await mergeChunk(hash, file.name)
-                    return
-                }
-                upLoadChunk(Not_UploadArray, hash, file.name)
+                alert(data);
+                return;
             }
+
+            if (controller.file.size <= 1024 * 1024 * 10) {
+                const formData = new FormData();
+                formData.append("hash", controller.hash);
+                formData.append("file", controller.file);
+                await axios.post("http://127.0.0.1:3000/upload/complete", formData, {
+                    onUploadProgress(e) {
+                        const percent = Math.round((e.loaded * 100) / e.total);
+                        progressBar.value = percent;
+                    }
+                });
+                return;
+            }
+
+            controller.uploadedCountStart = data.length;
+            const notUploaded = controller.chunkArray.filter(chunk => !data.includes(chunk.index + "-" + chunk.hash));
+            if (notUploaded.length === 0) {
+                await mergeChunk();
+                return;
+            }
+
+            uploadChunks(notUploaded);
         }
-        async function uploadFile(file, hash) {
-            const formData = new FormData()
-            formData.append("hash", hash)
-            formData.append("file", file)
-            const result = await axios.post("http://127.0.0.1:1122/upload/complete", formData, {
-                    onUploadProgress: (progressEvent) => {
-                        // 计算上传的百分比
-                        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                        progressBar.value = percentCompleted;
-                    },
-                })
-            return result
+
+        async function mergeChunk() {
+            await axios.get(`http://127.0.0.1:3000/merge?hash=${controller.hash}&fileName=${controller.fileName}`);
+            alert('上传完成并已合并！');
         }
-        async function mergeChunk(hash, name) {
-            const result = await axios.get("http://127.0.0.1:1122/merge?hash=" + hash + "&fileName=" + name)
-            return result
-        }
-        async function upLoadChunk(chunkArray, hash, name) {
+
+        function uploadChunks(chunkArray) {
             const formDataList = chunkArray.map(chunk => {
-                const formData = new FormData()
-                formData.append("hash", hash)
-                formData.append("chunkName", chunk.index + "-" + chunk.hash)
-                formData.append("chunk", chunk.blob)
-                return formData
-            })
-            // 多并发上传
-            const result = await concurrentUpload(formDataList, 3)
-            if (result.length === formDataList.length) {
-                await mergeChunk(hash, name)
-            }
-            // 单线程上传，效率较慢
-            /* let finishCount = 0;
-            for (const chunkFormData of formDataList) {
-                // 优化点：使用多并发【解决必须等一个文件上传完毕在上传下一个的问题】
-                const result = await axios.post("http://127.0.0.1:1122/upload", chunkFormData, {
-                    onUploadProgress: (progressEvent) => {
-                        // 计算上传的百分比
-                        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                        console.log(`Upload Progress: ${percentCompleted}%`);
-                        // 你可以在这里更新进度条或其他 UI 元素, 这里只是个示例，要检查多个文件上传进度的话不适用
-                    },
-                })
-                finishCount++
-                const overallProgress = Math.round((finishCount * 100) / chunkArray.length);
-                progressBar.value = overallProgress;
-            }
-            if (finishCount === formDataList.length) {
-                await mergeChunk(hash, name)
-            } */
-        }
-        function concurrentUpload(formDataList, limit = 3) {
-            return new Promise(async (resolve, reject) => {
-                if (formDataList.length === 0) {
-                    resolve([])
+                const formData = new FormData();
+                formData.append("hash", controller.hash);
+                formData.append("chunkName", `${chunk.index}-${chunk.hash}`);
+                formData.append("chunk", chunk.blob);
+                return formData;
+            });
+            concurrentUpload(formDataList, 3).then(async (res) => {
+                if (res.length === formDataList.length) {
+                    await mergeChunk();
                 }
-                let finishCount = 0;
-                let i = 0;
-                const result = []
+            });
+        }
+
+        function concurrentUpload(formDataList, limit = 3) {
+            return new Promise((resolve, reject) => {
+                if (formDataList.length === 0) return resolve([]);
+
+                let result = [];
+                let i = 0, finishCount = 0;
+
                 async function upload() {
-                    let index = i;
-                    i++;
+                    const index = i++;
+                    const source = axios.CancelToken.source();
+                    controller.abortList.push(source);
+
                     try {
-                        const res = await axios.post("http://127.0.0.1:1122/upload", formDataList[index])
-                        result[index] = res
+                        const res = await axios.post("http://127.0.0.1:3000/upload", formDataList[index], {
+                            cancelToken: source.token
+                        });
+                        result[index] = res;
                     } catch (e) {
-                        reject(e)
-                    } finally {
-                        finishCount++
-                        const overallProgress = Math.round((finishCount * 100) / formDataList.length);
-                        progressBar.value = overallProgress;
-                        if (i < formDataList.length) {
-                            upload()
+                        if (axios.isCancel(e)) {
+                            console.warn("上传已取消");
+                            return;
+                        } else {
+                            reject(e);
                         }
+                    } finally {
+                        finishCount++;
+                        const total = formDataList.length + controller.uploadedCountStart;
+                        const current = controller.uploadedCountStart + finishCount;
+                        progressBar.value = Math.round((current * 100) / total);
+
+                        if (i < formDataList.length && !controller.isPaused) {
+                            upload();
+                        }
+
                         if (finishCount === formDataList.length) {
-                            resolve(result)
+                            resolve(result);
                         }
                     }
                 }
-                for (let i = 0; i < limit && i < formDataList.length; i++) {
-                    upload()
+
+                for (let j = 0; j < limit && j < formDataList.length; j++) {
+                    upload();
                 }
-            })
+            });
+        }
+
+
+        function toggleUpload() {
+            if (controller.isPaused) {
+                resumeUpload();
+                toggleButton.textContent = "暂停上传";
+            } else {
+                pauseUpload();
+                toggleButton.textContent = "恢复上传";
+            }
+        }
+
+        function pauseUpload() {
+            controller.isPaused = true;
+            controller.abortList.forEach(source => source.cancel());
+            controller.abortList = [];
+        }
+
+        function resumeUpload() {
+            controller.isPaused = false;
+            verifyAndUpload(); // 会自动续传未上传部分
         }
 
         function cutFile(file) {
             return new Promise((resolve) => {
-                const fileSize = file.size;
-                const CHUNK_SIZE = 1024 * 1024 * 20;
-                // 切片数量
-                const CHUNK_COUNT = Math.ceil(fileSize / CHUNK_SIZE);
-                // 线程数量
+                const CHUNK_SIZE = 1024 * 1024 * 10;
+                const CHUNK_COUNT = Math.ceil(file.size / CHUNK_SIZE);
                 const THREAD_COUNT = navigator.hardwareConcurrency || 4;
-                // 每个线程要处理的切片数量
-                const THREAD_CHUNK_COUNT = Math.ceil(CHUNK_COUNT / THREAD_COUNT)
-                const result = []
-                let finishCount = 0
+                const THREAD_CHUNK_COUNT = Math.ceil(CHUNK_COUNT / THREAD_COUNT);
+
+                let result = [];
+                let finishCount = 0;
+
                 for (let i = 0; i < THREAD_COUNT && i < CHUNK_COUNT; i++) {
                     const start = i * THREAD_CHUNK_COUNT;
-                    const end = (i + 1) * THREAD_CHUNK_COUNT > CHUNK_COUNT ? CHUNK_COUNT : (i + 1) * THREAD_CHUNK_COUNT;
-                    const worker = new Worker('./worker.js', {
-                        type: "module"
-                    });
-                    worker.postMessage({
-                        file,
-                        start,
-                        end,
-                        CHUNK_SIZE
-                    })
-                    // 不按顺序
+                    const end = Math.min((i + 1) * THREAD_CHUNK_COUNT, CHUNK_COUNT);
+
+                    const worker = new Worker('./worker.js', { type: 'module' });
+                    worker.postMessage({ file, start, end, CHUNK_SIZE });
+
                     worker.onmessage = function (e) {
-                        result[i] = e.data
-                        this.terminate()
-                        finishCount++
-                        if (finishCount === CHUNK_COUNT || finishCount === THREAD_COUNT) {
+                        result[i] = e.data;
+                        worker.terminate();
+                        finishCount++;
+                        if (finishCount === THREAD_COUNT) {
                             resolve(result.flat());
                         }
-                    }
+                    };
                 }
-            })
+            });
         }
     </script>
 </body>
