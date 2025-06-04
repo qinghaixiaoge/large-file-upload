@@ -63,7 +63,7 @@
                 const spark = new SparkMD5();
                 spark.append(controller.file.name + controller.file.size); // 用文件名+大小模拟 hash
                 const hash = spark.end();
-                const { data: { code, msg, data } } = await axios.get(`http://127.0.0.1:3000/verify?hash=${hash}&fileName=${controller.fileName}`);
+                const { data: { code, msg, data } } = await axios.get(`/verify?hash=${hash}&fileName=${controller.fileName}`);
                 if (code) {
                     alert(data);
                     return;
@@ -71,7 +71,7 @@
                 const formData = new FormData();
                 formData.append("hash", hash);
                 formData.append("file", controller.file);
-                await axios.post("http://127.0.0.1:3000/upload/complete", formData, {
+                await axios.post("/upload/complete", formData, {
                     onUploadProgress(e) {
                         const percent = Math.round((e.loaded * 100) / e.total);
                         progressBar.value = percent;
@@ -89,7 +89,7 @@
         };
 
         async function verifyAndUpload() {
-            const { data: { code, msg, data } } = await axios.get(`http://127.0.0.1:3000/verify?hash=${controller.hash}&fileName=${controller.fileName}`);
+            const { data: { code, msg, data } } = await axios.get(`/verify?hash=${controller.hash}&fileName=${controller.fileName}`);
             if (code) {
                 alert(data);
                 return;
@@ -105,7 +105,7 @@
         }
 
         async function mergeChunk() {
-            await axios.get(`http://127.0.0.1:3000/merge?hash=${controller.hash}&fileName=${controller.fileName}`);
+            await axios.get(`/merge?hash=${controller.hash}&fileName=${controller.fileName}`);
             alert('上传完成并已合并！');
         }
 
@@ -137,7 +137,7 @@
                     controller.abortList.push(source);
 
                     try {
-                        const res = await axios.post("http://127.0.0.1:3000/upload", formDataList[index], {
+                        const res = await axios.post("/upload", formDataList[index], {
                             cancelToken: source.token
                         });
                         result[index] = res;
