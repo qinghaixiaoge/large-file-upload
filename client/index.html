@@ -193,6 +193,8 @@
         }
 
         function cutFile(file) {
+            console.log(file);
+
             return new Promise((resolve) => {
                 const CHUNK_SIZE = 1024 * 1024 * 10;
                 const CHUNK_COUNT = Math.ceil(file.size / CHUNK_SIZE);
@@ -205,6 +207,7 @@
                 for (let i = 0; i < THREAD_COUNT && i < CHUNK_COUNT; i++) {
                     const start = i * THREAD_CHUNK_COUNT;
                     const end = Math.min((i + 1) * THREAD_CHUNK_COUNT, CHUNK_COUNT);
+                    console.log(666);
 
                     const worker = new Worker('./worker.js', { type: 'module' });
                     worker.postMessage({ file, start, end, CHUNK_SIZE });
@@ -213,7 +216,8 @@
                         result[i] = e.data;
                         worker.terminate();
                         finishCount++;
-                        if (finishCount === THREAD_COUNT) {
+                        // 处理分块数量少于线程数量的情况
+                        if (finishCount === CHUNK_COUNT || finishCount === THREAD_COUNT) {
                             resolve(result.flat());
                         }
                     };
