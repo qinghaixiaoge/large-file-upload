@@ -1,14 +1,19 @@
 {
   "description": "",
   "scripts": {
-    "dev": "nodemon main.js"
+    "dev": "nodemon main.js",
+    "test": "mocha --reporter mocha-allure-reporter"
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "express": "^4.19.2",
     "fs-extra": "^11.2.0",
     "multer": "^1.4.5-lts.1",
-    "dotenv": "^16.4.7",
     "nodemon": "^3.1.9"
+  },
+  "devDependencies": {
+    "mocha": "^11.5.0",
+    "mocha-allure-reporter": "^1.4.0"
   }
 }
